@@ -6,7 +6,6 @@ import asyncio
 import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Cipher.PKCS1_OAEP import PKCS1OAEP_Cipher
 from Crypto.PublicKey import RSA
 from cryptography.hazmat.backends import default_backend
@@ -112,7 +111,7 @@ class PassThroughc1(StackingProtocol):
                 hm1.update(pkt.Ciphertext)
                 verifyMac = hm1.digest()
                 if (verifyMac == pkt.Mac):
-                    plaintext = decrypt(self.dec_aes, pkt.Ciphertext)
+                    plaintext = decrypt(self.enc_aes, pkt.Ciphertext)
                     print("--------------Mac Verified---------------")
                     self.higherProtocol().data_received(plaintext)
                 else:
@@ -135,12 +134,12 @@ class PassThroughc1(StackingProtocol):
         pubKeyObject = crtObj.get_pubkey()
         pubKeyString = crypto.dump_publickey(crypto.FILETYPE_PEM, pubKeyObject)
         key = RSA.importKey(pubKeyString)
-        Encrypter = PKCS1_OAEP.new(key)
+        Encrypter = PKCS1OAEP_Cipher(key, None, None, None)
         return Encrypter.encrypt(self.PKc)
 
     def dec_prekey(self, ciphertext):
         CpriK = RSA.importKey(self.C_privKey)
-        Decrypter = PKCS1_OAEP.new(CpriK)
+        Decrypter = PKCS1OAEP_Cipher(CpriK, None, None, None)
         return Decrypter.decrypt(ciphertext)
 
     def gen_block(self):
@@ -161,7 +160,7 @@ class PassThroughc1(StackingProtocol):
         iv_int = int(hexlify(self.IVs), 16)
         self.enc_ctr = Counter.new(AES.block_size * 8, initial_value=iv_int)
         # Create AES-CTR cipher.
-        self.dec_aes = AES.new(self.Eks, AES.MODE_CTR, counter=self.enc_ctr)
+        self.enc_aes = AES.new(self.Eks, AES.MODE_CTR, counter=self.enc_ctr)
 
     def send_pls_close(self, error_info=None):
         err_packet = PlsClose()
@@ -255,7 +254,7 @@ class PassThroughs1(StackingProtocol):
                 verifyMac = hm1.digest()
                 if(verifyMac == pkt.Mac):
                     print("--------------Mac Verified---------------")
-                    plaintext = decrypt(self.dec_aes, pkt.Ciphertext)
+                    plaintext = decrypt(self.enc_aes, pkt.Ciphertext)
                     self.higherProtocol().data_received(plaintext)
                 else:
                     self.send_pls_close("Mac Verification Failed")
@@ -277,12 +276,12 @@ class PassThroughs1(StackingProtocol):
         pubKeyObject = crtObj.get_pubkey()
         pubKeyString = crypto.dump_publickey(crypto.FILETYPE_PEM, pubKeyObject)
         key = RSA.importKey(pubKeyString)
-        Encrypter = PKCS1_OAEP.new(key)
+        Encrypter = PKCS1OAEP_Cipher(key, None, None, None)
         return Encrypter.encrypt(self.PKs)
 
     def dec_prekey(self, ciphertext):
         CpriK = RSA.importKey(self.SPriK)
-        Decrypter = PKCS1_OAEP.new(CpriK)
+        Decrypter = PKCS1OAEP_Cipher(CpriK, None, None, None)
         return Decrypter.decrypt(ciphertext)
 
     def gen_block(self):
@@ -299,11 +298,11 @@ class PassThroughs1(StackingProtocol):
         self.IVs = block_bytes[48:64]
         self.MKc = block_bytes[64:80]
         self.MKs = block_bytes[80:96]
-        #set up enc_engine
+        #set up enc engine
         iv_int = int(hexlify(self.IVc), 16)
         self.enc_ctr = Counter.new(AES.block_size * 8, initial_value=iv_int)
         # Create AES-CTR cipher.
-        self.dec_aes = AES.new(self.Ekc, AES.MODE_CTR, counter=self.enc_ctr)
+        self.enc_aes = AES.new(self.Ekc, AES.MODE_CTR, counter=self.enc_ctr)
 
     def send_pls_close(self, error_info=None):
         err_packet = PlsClose()
@@ -386,6 +385,7 @@ def verify_certchain(certs,address):
     return True
 
 def decrypt(aes, ciphertext):
+
     # Decrypt and return the plaintext.
     plaintext = aes.decrypt(ciphertext)
     print("-----------------Dec----------------")
