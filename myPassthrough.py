@@ -112,7 +112,7 @@ class PassThroughc1(StackingProtocol):
                 verifyMac = hm1.digest()
                 if (verifyMac == pkt.Mac):
                     plaintext = decrypt(self.enc_aes, pkt.Ciphertext)
-                    print("--------------Mac Verified---------------")
+                    logging.info("--------------Mac Verified---------------")
                     self.higherProtocol().data_received(plaintext)
                 else:
                     self.send_pls_close("Mac Verification Failed")
