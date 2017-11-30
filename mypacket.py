@@ -78,20 +78,6 @@ class PEEPPacket(PacketType):
 # RIP-ACK -  TYPE 4
 # DATA -      TYPE 5
 
-'''
-    def generateNonce(self,length):
-        """Generate pseudo-random number."""
-        return ''.join([str(random.randint(0, 9)) for i in range(length)])
-
-    def generate_timestamp(self):
-        """Get seconds since epoch (UTC)."""
-        return str(int(time.time()))
-
-    def generate_nonce_timestamp(self):
-        """Generate pseudo-random number and seconds since epoch (UTC)."""
-        nonce = uuid.uuid1()
-        oauth_timestamp, oauth_nonce = str(nonce.time), nonce.hex
-        return oauth_nonce, oauth_timestamp'''
 
 class PacketBaseType(PacketType):
     DEFINITION_IDENTIFIER = "netsecfall2017.pls.base"
@@ -107,34 +93,6 @@ class PlsHello(PacketBaseType):
         ("Nonce", UINT64),
         ("Certs", LIST(BUFFER))
     ]
-    def generateNonce(self,length):
-        """Generate pseudo-random number."""
-        return random.getrandbits(length)
-    def generateCerts(self):
-        """Generate Certs for PLS"""
-        # create a key pair
-        k = crypto.PKey()
-        k.generate_key(crypto.TYPE_RSA, 1024)
-        # create a self-signed cert
-        cert = crypto.X509()
-        cert.get_subject().C = "US"
-        cert.get_subject().ST = "Baltimore"
-        cert.get_subject().L = "Baltimore"
-        cert.get_subject().O = "netsec fall17"
-        cert.get_subject().OU = "netsec fall17"
-        cert.get_subject().CN = "fall 17"
-        cert.set_serial_number(1000)
-        cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
-        cert.set_issuer(cert.get_subject())
-        cert.set_pubkey(k)
-        cert.sign(k, 'sha1')
-        cert_buffer = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
-        #open(CERT_FILE, "wt").write(
-        #    crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-        #open(KEY_FILE, "wt").write(
-        #    crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
-        return cert_buffer
 
 
 class PlsKeyExchange(PacketBaseType):
