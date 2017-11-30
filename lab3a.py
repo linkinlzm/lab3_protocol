@@ -91,12 +91,12 @@ class MyProtocolServer(asyncio.Protocol):
 #
 
 def PeepClientFactory():
-    fclient = StackingProtocolFactory(lambda: PassThroughc1(), lambda: PassThroughc2())
+    fclient = StackingProtocolFactory(lambda: PassThroughc2(), lambda: PassThroughc1())
     return fclient
 
 
 def PeepServerFactory():
-    fserver = StackingProtocolFactory(lambda: PassThroughs1(), lambda: PassThroughs2())
+    fserver = StackingProtocolFactory(lambda: PassThroughs2(), lambda: PassThroughs1())
     return fserver
 
 
@@ -116,8 +116,8 @@ def basicUnitTest():
     if 0 not in echoArgs:
         sys.exit("1")
 
-    fclient = StackingProtocolFactory(lambda: PassThroughc1(), lambda: PassThroughc2())
-    fserver = StackingProtocolFactory(lambda: PassThroughs1(), lambda: PassThroughs2())
+    fclient = StackingProtocolFactory(lambda: PassThroughc2(), lambda: PassThroughc1())
+    fserver = StackingProtocolFactory(lambda: PassThroughs2(), lambda: PassThroughs1())
 
     lab3Connector = playground.Connector(protocolStack=(
         fclient,
