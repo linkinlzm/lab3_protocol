@@ -428,8 +428,7 @@ class PassThroughc2(StackingProtocol):
                 self.ack_counter = 0
                 self.timeout_timer = time.time()
                 self.higherTransport.sent_data()
-            else:
-                #print("client waiting...to...end")
+
 
         if time.time() - self.close_timer > 99999:
             self.forceclose += 1
