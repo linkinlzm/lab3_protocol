@@ -107,8 +107,34 @@ class PlsHello(PacketBaseType):
         ("Nonce", UINT64),
         ("Certs", LIST(BUFFER))
     ]
-
-
+    def generateNonce(self,length):
+        """Generate pseudo-random number."""
+        return random.getrandbits(length)
+    def generateCerts(self):
+        """Generate Certs for PLS"""
+        # create a key pair
+        k = crypto.PKey()
+        k.generate_key(crypto.TYPE_RSA, 1024)
+        # create a self-signed cert
+        cert = crypto.X509()
+        cert.get_subject().C = "US"
+        cert.get_subject().ST = "Baltimore"
+        cert.get_subject().L = "Baltimore"
+        cert.get_subject().O = "netsec fall17"
+        cert.get_subject().OU = "netsec fall17"
+        cert.get_subject().CN = "fall 17"
+        cert.set_serial_number(1000)
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
+        cert.set_issuer(cert.get_subject())
+        cert.set_pubkey(k)
+        cert.sign(k, 'sha1')
+        cert_buffer = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+        #open(CERT_FILE, "wt").write(
+        #    crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+        #open(KEY_FILE, "wt").write(
+        #    crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
+        return cert_buffer
 
 
 class PlsKeyExchange(PacketBaseType):

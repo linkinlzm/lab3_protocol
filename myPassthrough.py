@@ -1,6 +1,6 @@
 from .MyProtocolTransport import *
 from .CertFactory import *
-from playground.common.CipherUtil import RSA_SIGNATURE_MAC
+from playground.common.CipherUtil import *
 import logging
 import asyncio
 import hashlib
@@ -8,11 +8,9 @@ from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from Crypto.Cipher.PKCS1_OAEP import PKCS1OAEP_Cipher
 from Crypto.PublicKey import RSA
-from cryptography.hazmat.backends import default_backend
-from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
-from Crypto.Hash import HMAC, SHA, SHA256
+from Crypto.Hash import HMAC, SHA256
 from binascii import hexlify
 from OpenSSL import crypto
 logging.getLogger().setLevel(logging.NOTSET)  # this logs *everything*
@@ -107,11 +105,11 @@ class PassThroughc1(StackingProtocol):
                 else:
                     print("Hash validated error!")
             elif isinstance(pkt, PlsData) and self.handshake:
-                hm1 = HMAC.new(self.MKs, digestmod=SHA)
+                hm1 = HMAC.new(self.MKs, digestmod=SHA256)
                 hm1.update(pkt.Ciphertext)
                 verifyMac = hm1.digest()
                 if (verifyMac == pkt.Mac):
-                    plaintext = decrypt(self.enc_aes, pkt.Ciphertext)
+                    plaintext = decrypt(self.Eks, self.IVs, pkt.Ciphertext)
                     print("--------------Mac Verified---------------")
                     self.higherProtocol().data_received(plaintext)
                 else:
@@ -143,24 +141,31 @@ class PassThroughc1(StackingProtocol):
         return Decrypter.decrypt(ciphertext)
 
     def gen_block(self):
-        block_0 = hashlib.sha1(b"PLS1.0" + self.C_Nonce.to_bytes(8, byteorder='big') + self.S_Nonce.to_bytes(8,byteorder='big') + self.PKc + self.PKs).digest()
-        block_1 = hashlib.sha1(block_0).digest()
-        block_2 = hashlib.sha1(block_1).digest()
-        block_3 = hashlib.sha1(block_2).digest()
-        block_4 = hashlib.sha1(block_3).digest()
-        block_bytes = block_0 + block_1 + block_2 + block_3 + block_4
+        print(str(self.C_Nonce).encode('utf-8') + str(self.S_Nonce).encode('utf-8') + str(self.PKc).encode('utf-8') + str(self.PKs).encode('utf-8'))
+        self.shash.update("PLS1.0".encode('utf-8') + str(self.C_Nonce).encode('utf-8') + str(self.S_Nonce).encode('utf-8') + str(self.PKc).encode('utf-8') + str(self.PKs).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_1
+        self.shash.update(str(self.block[0]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_2
+        self.shash.update(str(self.block[1]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_3
+        self.shash.update(str(self.block[2]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_4
+        self.shash.update(str(self.block[3]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # for blo in self.block:
+        #    print(blo)
+        self.block_bytes = hexlify(self.block[0] + self.block[1] + self.block[2] + self.block[3] + self.block[4])
         # print(len(self.block_bytes))
-        self.Ekc = block_bytes[0:16]
-        self.Eks = block_bytes[16:32]
-        self.IVc = block_bytes[32:48]
-        self.IVs = block_bytes[48:64]
-        self.MKc = block_bytes[64:80]
-        self.MKs = block_bytes[80:96]
-
-        iv_int = int(hexlify(self.IVs), 16)
-        self.enc_ctr = Counter.new(AES.block_size * 8, initial_value=iv_int)
-        # Create AES-CTR cipher.
-        self.enc_aes = AES.new(self.Eks, AES.MODE_CTR, counter=self.enc_ctr)
+        self.Ekc = self.block_bytes[0:32]
+        self.Eks = self.block_bytes[32:64]
+        self.IVc = self.block_bytes[64:96]
+        self.IVs = self.block_bytes[96:128]
+        self.MKc = self.block_bytes[128:160]
+        self.MKs = self.block_bytes[160:192]
 
     def send_pls_close(self, error_info=None):
         err_packet = PlsClose()
@@ -249,12 +254,12 @@ class PassThroughs1(StackingProtocol):
                 else:
                     print("Hash validated error!")
             elif isinstance(pkt, PlsData) and self.handshake:
-                hm1 = HMAC.new(self.MKc, digestmod=SHA)
+                hm1 = HMAC.new(self.MKc, digestmod=SHA256)
                 hm1.update(pkt.Ciphertext)
                 verifyMac = hm1.digest()
                 if(verifyMac == pkt.Mac):
                     print("--------------Mac Verified---------------")
-                    plaintext = decrypt(self.enc_aes, pkt.Ciphertext)
+                    plaintext = decrypt(self.Ekc, self.IVc, pkt.Ciphertext)
                     self.higherProtocol().data_received(plaintext)
                 else:
                     self.send_pls_close("Mac Verification Failed")
@@ -285,24 +290,29 @@ class PassThroughs1(StackingProtocol):
         return Decrypter.decrypt(ciphertext)
 
     def gen_block(self):
-        block_0 = hashlib.sha1(b"PLS1.0" + self.C_Nonce.to_bytes(8, byteorder='big') + self.S_Nonce.to_bytes(8,byteorder='big') + self.PKc + self.PKs).digest()
-        block_1 = hashlib.sha1(block_0).digest()
-        block_2 = hashlib.sha1(block_1).digest()
-        block_3 = hashlib.sha1(block_2).digest()
-        block_4 = hashlib.sha1(block_3).digest()
-        block_bytes = block_0 + block_1 + block_2 + block_3 + block_4
+        print(str(self.C_Nonce).encode('utf-8') + str(self.S_Nonce).encode('utf-8') + str(self.PKc).encode('utf-8') + str(self.PKs).encode('utf-8'))
+        self.shash.update("PLS1.0".encode('utf-8') + str(self.C_Nonce).encode('utf-8') + str(self.S_Nonce).encode('utf-8') + str(self.PKc).encode('utf-8') + str(self.PKs).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_1
+        self.shash.update(str(self.block[0]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_2
+        self.shash.update(str(self.block[1]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_3
+        self.shash.update(str(self.block[2]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        # block_4
+        self.shash.update(str(self.block[3]).encode('utf-8'))
+        self.block.append(self.shash.digest())
+        self.block_bytes = hexlify(self.block[0] + self.block[1] + self.block[2] + self.block[3] + self.block[4])
         # print(len(self.block_bytes))
-        self.Ekc = block_bytes[0:16]
-        self.Eks = block_bytes[16:32]
-        self.IVc = block_bytes[32:48]
-        self.IVs = block_bytes[48:64]
-        self.MKc = block_bytes[64:80]
-        self.MKs = block_bytes[80:96]
-        #set up enc engine
-        iv_int = int(hexlify(self.IVc), 16)
-        self.enc_ctr = Counter.new(AES.block_size * 8, initial_value=iv_int)
-        # Create AES-CTR cipher.
-        self.enc_aes = AES.new(self.Ekc, AES.MODE_CTR, counter=self.enc_ctr)
+        self.Ekc = self.block_bytes[0:32]
+        self.Eks = self.block_bytes[32:64]
+        self.IVc = self.block_bytes[64:96]
+        self.IVs = self.block_bytes[96:128]
+        self.MKc = self.block_bytes[128:160]
+        self.MKs = self.block_bytes[160:192]
 
     def send_pls_close(self, error_info=None):
         err_packet = PlsClose()
@@ -384,11 +394,14 @@ def verify_certchain(certs,address):
             print("signature verified")
     return True
 
-def decrypt(aes, ciphertext):
-
+def decrypt(key, iv, ciphertext):
+    assert len(key) == key_bytes
+    iv_int = int(iv, 16)
+    ctr = Counter.new(AES.block_size * 8, initial_value=iv_int)
+    # Create AES-CTR cipher.
+    aes = AES.new(key, AES.MODE_CTR, counter=ctr)
     # Decrypt and return the plaintext.
     plaintext = aes.decrypt(ciphertext)
-    print("-----------------Dec----------------")
     return plaintext
 
 
@@ -490,7 +503,7 @@ class PassThroughc2(StackingProtocol):
                         self.expected_packet = pkt.SequenceNumber
                         self.expected_ack = pkt.SequenceNumber + packet_size
                         # setup stuff for data transfer
-                        self.info_list.sequenceNumber = self.seq - 1
+                        self.info_list.sequenceNumber = self.seq
                         self.info_list.init_seq = self.seq
                         self.higherTransport = MyTransport(self.transport)
                         self.higherTransport.setinfo(self.info_list)
@@ -502,7 +515,7 @@ class PassThroughc2(StackingProtocol):
                         # client and server should be the same, start from here
                 elif self.handshake:
                     if pkt.Type == 5:
-                        if verify_packet(pkt, self.expected_packet+1):
+                        if verify_packet(pkt, self.expected_packet):
                             # print("verify_packet from server")
                             self.lastcorrect = pkt.SequenceNumber + len(pkt.Data)
                             self.expected_packet = self.expected_packet + len(pkt.Data)
@@ -630,7 +643,7 @@ class PassThroughs2(StackingProtocol):
                         self.expected_packet = pkt.SequenceNumber
                         self.expected_ack = pkt.SequenceNumber + packet_size
                         # setup stuff for data transfer
-                        self.info_list.sequenceNumber = self.seq + 1
+                        self.info_list.sequenceNumber = self.seq
                         self.info_list.init_seq = self.seq
 
                         self.higherTransport = MyTransport(self.transport)
@@ -644,7 +657,7 @@ class PassThroughs2(StackingProtocol):
                         # client and server should be the same, start from here
                 elif self.handshake:
                     if pkt.Type == 5:
-                        if verify_packet(pkt, self.expected_packet - 1):
+                        if verify_packet(pkt, self.expected_packet):
                             # print("verify_packet from server")
                             self.lastcorrect = pkt.SequenceNumber + len(pkt.Data)
                             self.expected_packet = self.expected_packet + len(pkt.Data)
