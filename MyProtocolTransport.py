@@ -68,7 +68,7 @@ class MyTransport(StackingTransport):
             # small_packet.SessionId = self.info_list.SessionId
             small_packet.Checksum = small_packet.calculateChecksum()
 
-            print(self.lowerTransport().is_closing())
+            #print(self.lowerTransport().is_closing())
             self.lowerTransport().write(small_packet.__serialize__())
 
             if n > window_size:
@@ -113,7 +113,6 @@ class PLSTransport(StackingTransport):
 
     def close(self):
         self.lowerTransport().close()
-
 
 
 
