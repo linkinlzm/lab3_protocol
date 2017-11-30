@@ -431,7 +431,7 @@ class PassThroughc2(StackingProtocol):
             else:
                 print("client waiting...to...end")
 
-        if time.time() - self.close_timer > 10:
+        if time.time() - self.close_timer > 99999:
             self.forceclose += 1
             self.close_timer = time.time()
             Rip = PEEPPacket()
