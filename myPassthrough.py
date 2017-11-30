@@ -15,8 +15,8 @@ from cryptography import x509
 from Crypto.Hash import HMAC, SHA, SHA256
 from binascii import hexlify
 from OpenSSL import crypto
-logging.getLogger().setLevel(logging.NOTSET)  # this logs *everything*
-logging.getLogger().addHandler(logging.StreamHandler())  # logs to stderr
+#logging.getLogger().setLevel(logging.NOTSET)  # this logs *everything*
+#logging.getLogger().addHandler(logging.StreamHandler())  # logs to stderr
 
 key_bytes = 32
 # M1, C->S:  PlsHello(Nc, [C_Certs])
@@ -205,7 +205,7 @@ class PassThroughs1(StackingProtocol):
                 self.C_Certs = pkt.Certs
                 address = self.transport.get_extra_info("peername")[0]
                 if (verify_certchain(self.C_Certs, address)):
-                    print("cert verified")
+                    logging.info("cert verified")
                 else:
                     self.send_pls_close()
                     self.higherTransport.close("Cert Verification Failed")
@@ -216,12 +216,12 @@ class PassThroughs1(StackingProtocol):
                 self.hashresult.update(bytes(helloPkt.__serialize__()))
                 self.state = 1
                 self.transport.write(helloPkt.__serialize__())
-                print("server: PlsHello sent")
+                logging.info("server: PlsHello sent")
             elif isinstance(pkt, PlsKeyExchange) and self.state == 1:
                 self.hashresult.update(bytes(pkt.__serialize__()))
                 # check nc
                 if pkt.NoncePlusOne == self.S_Nonce + 1:
-                    print("server: check NC+1")
+                    logging.info("server: check NC+1")
                     self.PKc = self.dec_prekey(pkt.PreKey)
                     keyExchange = PlsKeyExchange()
                     keyExchange.PreKey = self.enc_prekey()
@@ -230,12 +230,12 @@ class PassThroughs1(StackingProtocol):
                     self.state = 2
                     self.transport.write(keyExchange.__serialize__())
                 else:
-                    print("server: NC+1 error")
+                    logging.info("server: NC+1 error")
                     self.higherTransport.close("NC Verification Failed")
             elif isinstance(pkt, PlsHandshakeDone) and self.state == 2:
                 hdshkdone = PlsHandshakeDone()
                 hdshkdone.ValidationHash = self.hashresult.digest()
-                print("server: Reveive handshake done")
+                logging.info("server: Reveive handshake done")
                 # check hash
                 if self.hashresult.digest() == pkt.ValidationHash:
                     self.state = 3
@@ -348,26 +348,26 @@ def verify_certchain(certs,address):
     logging.info(
         "Email address: {}".format(X509_list[0].subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS)[0].value))
     if address == X509_list[0].subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value:
-        print("Common name verified")
+        logging.info("Common name verified")
     else:
-        print("Common name error")
+        logging.info("Common name error")
         return False
     for i in range(len(X509_list) - 1):
         this = X509_list[i].subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
         if this.startswith(X509_list[i + 1].subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value):
-            print("Address verified")
+            logging.info("Address verified")
         else:
             return False
-            print("Address error")
+            logging.info("Address error")
 
     # verify the issuer and subject
     for i in range(len(crypto_list) - 1):
         issuer = crypto_list[i].get_issuer()
-        print(issuer)
+        logging.info(issuer)
         subject = crypto_list[i + 1].get_subject()
-        print(subject)
+        logging.info(subject)
         if issuer == subject:
-            print("issuer and subject verified")
+            logging.info("issuer and subject verified")
         else:
             return False
 
@@ -381,14 +381,14 @@ def verify_certchain(certs,address):
         if not sig.verify(this.tbs_certificate_bytes, this.signature):
             return False
         else:
-            print("signature verified")
+            logging.info("signature verified")
     return True
 
 def decrypt(aes, ciphertext):
 
     # Decrypt and return the plaintext.
     plaintext = aes.decrypt(ciphertext)
-    print("-----------------Dec----------------")
+    logging.info("-----------------Dec----------------")
     return plaintext
 
 

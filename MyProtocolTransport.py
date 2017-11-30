@@ -65,7 +65,7 @@ class MyTransport(StackingTransport):
                 small_packet.SequenceNumber = self.info_list.sequenceNumber
                 self.info_list.sequenceNumber += len(packet_data)
                 n = 999
-            print("this is the out seq number from write: " + str(self.info_list.sequenceNumber))
+            logging.info("this is the out seq number from write: " + str(self.info_list.sequenceNumber))
             small_packet.Type = 5  # data packet
             small_packet.Data = packet_data
             # small_packet.SessionId = self.info_list.SessionId
@@ -84,9 +84,9 @@ class MyTransport(StackingTransport):
 class PLSTransport(StackingTransport):
     def write(self, data):
         PLSpacket = PlsData()
-        print("PLS transport got data")
+        logging.info("PLS transport got data")
         ciphertext = self.enc_aes.update(data)
-        print("---------------Enc---------------")
+        logging.info("---------------Enc---------------")
         PLSpacket.Ciphertext = ciphertext
         hm1 = hmac.HMAC(self.mac, hashes.SHA1(), backend=default_backend())
         hm1.update(ciphertext)
