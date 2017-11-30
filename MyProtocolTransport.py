@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives import hashes, hmac
 packet_size = 1000
 window_size = 5
 from binascii import hexlify
-
+import logging
 class item_list():
     sequenceNumber = 0
     SessionId = ''
